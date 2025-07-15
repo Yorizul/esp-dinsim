@@ -1,158 +1,216 @@
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local hrp = character:WaitForChild("HumanoidRootPart")
+local RunService = game:GetService("RunService")
 
-local espEnabled = true
-local autoCollect = true
-local collectSpeed = 150 -- Bisa diubah dari GUI
+local player = Players.LocalPlayer
+local rootPart = nil
 
--- === ESP ===
-local function createESP(target)
-	if target:FindFirstChild("ESP") or not espEnabled then return end
+-- KONFIGURASI
+local TARGET_NAME = "AmberRock"
+local MOVE_SPEED = 200 -- Speed tween
+local MAX_DISTANCE = 1000 -- Jarak maksimum untuk auto collect
+local ESP_COLOR = Color3.fromRGB(255, 170, 0)
 
-	local adornee = target:IsA("Model") and target.PrimaryPart or target
-	if not adornee then return end
+local espEnabled = false
+local autoCollectEnabled = false
+local collecting = false
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "ESP"
-	billboard.Adornee = adornee
+-- GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "AmberGUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 120)
+frame.Position = UDim2.new(0.5, -100, 0.5, -60)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BackgroundTransparency = 0.3
+frame.Active = true
+frame.Selectable = true
+frame.Draggable = false
+frame.Parent = gui
+
+-- Geser GUI Mobile
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+frame.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Tombol GUI
+local espBtn = Instance.new("TextButton", frame)
+espBtn.Size = UDim2.new(1, 0, 0.33, 0)
+espBtn.Position = UDim2.new(0, 0, 0, 0)
+espBtn.Text = "🔲 ESP: OFF"
+espBtn.BackgroundTransparency = 1
+espBtn.TextColor3 = Color3.new(1, 1, 1)
+espBtn.TextScaled = true
+
+local autoBtn = Instance.new("TextButton", frame)
+autoBtn.Size = UDim2.new(1, 0, 0.33, 0)
+autoBtn.Position = UDim2.new(0, 0, 0.33, 0)
+autoBtn.Text = "⚙️ AutoCollect: OFF"
+autoBtn.BackgroundTransparency = 1
+autoBtn.TextColor3 = Color3.new(1, 1, 1)
+autoBtn.TextScaled = true
+
+local hideBtn = Instance.new("TextButton", frame)
+hideBtn.Size = UDim2.new(1, 0, 0.34, 0)
+hideBtn.Position = UDim2.new(0, 0, 0.66, 0)
+hideBtn.Text = "🔽 Sembunyikan"
+hideBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+hideBtn.TextColor3 = Color3.new(1, 1, 1)
+hideBtn.TextScaled = true
+
+-- Toggle GUI
+espBtn.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	espBtn.Text = espEnabled and "🟩 ESP: ON" or "🔲 ESP: OFF"
+end)
+
+autoBtn.MouseButton1Click:Connect(function()
+	autoCollectEnabled = not autoCollectEnabled
+	autoBtn.Text = autoCollectEnabled and "🟢 AutoCollect: ON" or "⚙️ AutoCollect: OFF"
+end)
+
+local isHidden = false
+hideBtn.MouseButton1Click:Connect(function()
+	isHidden = not isHidden
+	espBtn.Visible = not isHidden
+	autoBtn.Visible = not isHidden
+	hideBtn.Text = isHidden and "🔼 Tampilkan" or "🔽 Sembunyikan"
+end)
+
+-- ESP
+local function createESP(model)
+	if model:FindFirstChild("ESPLabel") then return end
+	local part = model:FindFirstChildWhichIsA("BasePart")
+	if not part then return end
+
+	local billboard = Instance.new("BillboardGui", model)
+	billboard.Name = "ESPLabel"
 	billboard.Size = UDim2.new(0, 100, 0, 30)
+	billboard.Adornee = part
 	billboard.AlwaysOnTop = true
-	billboard.StudsOffset = Vector3.new(0, 2, 0)
 
-	local label = Instance.new("TextLabel")
+	local label = Instance.new("TextLabel", billboard)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
-	label.Text = "AmberRock"
-	label.TextColor3 = Color3.fromRGB(255, 170, 0)
-	label.TextStrokeTransparency = 0.5
+	label.Text = model.Name
+	label.TextColor3 = ESP_COLOR
 	label.TextScaled = true
-	label.Font = Enum.Font.SourceSansBold
-	label.Parent = billboard
-
-	billboard.Parent = target
 end
 
-local function removeAllESP()
-	for _, obj in pairs(workspace:GetDescendants()) do
-		if obj.Name == "AmberRock" and obj:FindFirstChild("ESP") then
-			obj.ESP:Destroy()
+-- Interact
+local function interactWithPrompt(model)
+	for _, d in pairs(model:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			pcall(function()
+				fireproximityprompt(d)
+			end)
+			break
 		end
 	end
 end
 
--- === Tween to Target ===
-local moving = false
-local function moveToTarget(part)
-	if moving or not autoCollect then return end
-	moving = true
+-- Tween dan Interact
+local function moveTo(model)
+	local part = model:FindFirstChildWhichIsA("BasePart")
+	if not part then return false end
 
-	local distance = (hrp.Position - part.Position).Magnitude
-	local time = distance / collectSpeed
+	local rayOrigin = part.Position + Vector3.new(0, 5, 0)
+	local rayDirection = Vector3.new(0, -100, 0)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {model}
+	params.FilterType = Enum.RaycastFilterType.Blacklist
 
-	local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = part.CFrame + Vector3.new(0, 2, 0)})
+	local result = workspace:Raycast(rayOrigin, rayDirection, params)
+	local targetPos = result and result.Position + Vector3.new(0, 3, 0) or part.Position + Vector3.new(0, 3, 0)
+
+	local dist = (rootPart.Position - targetPos).Magnitude
+	local time = dist / MOVE_SPEED
+
+	local tween = TweenService:Create(rootPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
+		CFrame = CFrame.new(targetPos)
+	})
+
 	tween:Play()
 	tween.Completed:Wait()
 
-	task.wait(0.1)
-	moving = false
-end
-
--- === Handle Rock ===
-local function handleAmberRock(obj)
-	if obj.Name ~= "AmberRock" then return end
-	if not (obj:IsA("Model") or obj:IsA("BasePart")) then return end
-	task.wait(0.2)
-
-	if obj:IsA("Model") and not obj.PrimaryPart then
-		local part = obj:FindFirstChildWhichIsA("BasePart")
-		if not part then return end
-		obj.PrimaryPart = part
+	for i = 1, 20 do
+		interactWithPrompt(model)
+		task.wait(0.1)
+		if not model:IsDescendantOf(workspace) then
+			return true
+		end
 	end
 
-	createESP(obj)
-
-	local part = obj:IsA("Model") and obj.PrimaryPart or obj
-	if part then
-		moveToTarget(part)
-	end
+	return false
 end
 
--- === Scan semua ===
-local function scanAll()
-	for _, obj in pairs(workspace:GetDescendants()) do
-		handleAmberRock(obj)
-	end
-end
+-- Main Loop
+task.spawn(function()
+	while true do
+		if not rootPart or not rootPart:IsDescendantOf(workspace) then
+			local char = player.Character or player.CharacterAdded:Wait()
+			rootPart = char:WaitForChild("HumanoidRootPart")
+		end
 
-workspace.DescendantAdded:Connect(handleAmberRock)
-
--- === GUI ===
-local function createMobileGui()
-	local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-	gui.Name = "ESPGui"
-	gui.ResetOnSpawn = false
-
-	local espButton = Instance.new("TextButton")
-	espButton.Size = UDim2.new(0, 120, 0, 35)
-	espButton.Position = UDim2.new(0, 10, 0, 10)
-	espButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	espButton.TextColor3 = Color3.new(1, 1, 1)
-	espButton.TextScaled = true
-	espButton.Font = Enum.Font.SourceSansBold
-	espButton.Text = "ESP: ON"
-	espButton.Parent = gui
-
-	local collectButton = Instance.new("TextButton")
-	collectButton.Size = UDim2.new(0, 120, 0, 35)
-	collectButton.Position = UDim2.new(0, 10, 0, 50)
-	collectButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	collectButton.TextColor3 = Color3.new(1, 1, 1)
-	collectButton.TextScaled = true
-	collectButton.Font = Enum.Font.SourceSansBold
-	collectButton.Text = "Collect: ON"
-	collectButton.Parent = gui
-
-	local speedBox = Instance.new("TextBox")
-	speedBox.Size = UDim2.new(0, 120, 0, 35)
-	speedBox.Position = UDim2.new(0, 10, 0, 90)
-	speedBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	speedBox.TextColor3 = Color3.new(1, 1, 1)
-	speedBox.TextScaled = true
-	speedBox.Font = Enum.Font.SourceSans
-	speedBox.PlaceholderText = "Speed (100–200)"
-	speedBox.Text = tostring(collectSpeed)
-	speedBox.ClearTextOnFocus = false
-	speedBox.Parent = gui
-
-	espButton.MouseButton1Click:Connect(function()
-		espEnabled = not espEnabled
-		espButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
 		if espEnabled then
-			scanAll()
-		else
-			removeAllESP()
+			for _, obj in pairs(workspace:GetDescendants()) do
+				if obj:IsA("Model") and obj.Name == TARGET_NAME then
+					createESP(obj)
+				end
+			end
 		end
-	end)
 
-	collectButton.MouseButton1Click:Connect(function()
-		autoCollect = not autoCollect
-		collectButton.Text = autoCollect and "Collect: ON" or "Collect: OFF"
-	end)
+		if autoCollectEnabled and not collecting then
+			collecting = true
+			local targets = {}
 
-	speedBox.FocusLost:Connect(function(enterPressed)
-		local val = tonumber(speedBox.Text)
-		if val and val >= 100 and val <= 200 then
-			collectSpeed = val
-			speedBox.Text = tostring(val)
-		else
-			speedBox.Text = tostring(collectSpeed)
+			for _, obj in pairs(workspace:GetDescendants()) do
+				if obj:IsA("Model") and obj.Name == TARGET_NAME then
+					local part = obj:FindFirstChildWhichIsA("BasePart")
+					if part then
+						local dist = (rootPart.Position - part.Position).Magnitude
+						if dist <= MAX_DISTANCE then
+							table.insert(targets, {model = obj, distance = dist})
+						end
+					end
+				end
+			end
+
+			table.sort(targets, function(a, b)
+				return a.distance < b.distance
+			end)
+
+			for _, target in ipairs(targets) do
+				if autoCollectEnabled and target.model and target.model.Parent then
+					local success = moveTo(target.model)
+					if success then
+						-- langsung lanjut ke yang berikutnya
+					end
+				end
+			end
+
+			collecting = false
 		end
-	end)
-end
 
--- === Start ===
-createMobileGui()
-scanAll()
+		task.wait(0.3)
+	end
+end)

@@ -7,8 +7,8 @@ local rootPart = nil
 
 -- KONFIGURASI
 local TARGET_NAME = "AmberRock"
-local MOVE_SPEED = 200 -- Speed tween
-local MAX_DISTANCE = 1000 -- Jarak maksimum untuk auto collect
+local MOVE_SPEED = 200
+local MAX_DISTANCE = 1000
 local ESP_COLOR = Color3.fromRGB(255, 170, 0)
 
 local espEnabled = false
@@ -30,7 +30,7 @@ frame.Selectable = true
 frame.Draggable = false
 frame.Parent = gui
 
--- Geser GUI Mobile
+-- Geser GUI Support
 local dragging, dragStart, startPos
 frame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -56,7 +56,7 @@ end)
 local espBtn = Instance.new("TextButton", frame)
 espBtn.Size = UDim2.new(1, 0, 0.33, 0)
 espBtn.Position = UDim2.new(0, 0, 0, 0)
-espBtn.Text = "🔲 ESP: OFF"
+espBtn.Text = "🔲 Esp Amber: OFF"
 espBtn.BackgroundTransparency = 1
 espBtn.TextColor3 = Color3.new(1, 1, 1)
 espBtn.TextScaled = true
@@ -72,7 +72,7 @@ autoBtn.TextScaled = true
 local hideBtn = Instance.new("TextButton", frame)
 hideBtn.Size = UDim2.new(1, 0, 0.34, 0)
 hideBtn.Position = UDim2.new(0, 0, 0.66, 0)
-hideBtn.Text = "🔽 Sembunyikan"
+hideBtn.Text = "🔽 Hide"
 hideBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 hideBtn.TextColor3 = Color3.new(1, 1, 1)
 hideBtn.TextScaled = true
@@ -80,7 +80,7 @@ hideBtn.TextScaled = true
 -- Toggle GUI
 espBtn.MouseButton1Click:Connect(function()
 	espEnabled = not espEnabled
-	espBtn.Text = espEnabled and "🟩 ESP: ON" or "🔲 ESP: OFF"
+	espBtn.Text = espEnabled and "🟩 Esp Amber: ON" or "🔲 Esp Amber: OFF"
 end)
 
 autoBtn.MouseButton1Click:Connect(function()
@@ -93,7 +93,7 @@ hideBtn.MouseButton1Click:Connect(function()
 	isHidden = not isHidden
 	espBtn.Visible = not isHidden
 	autoBtn.Visible = not isHidden
-	hideBtn.Text = isHidden and "🔼 Tampilkan" or "🔽 Sembunyikan"
+	hideBtn.Text = isHidden and "🔼 Show" or "🔽 Hide"
 end)
 
 -- ESP
@@ -203,7 +203,7 @@ task.spawn(function()
 				if autoCollectEnabled and target.model and target.model.Parent then
 					local success = moveTo(target.model)
 					if success then
-						-- langsung lanjut ke yang berikutnya
+						-- langsung lanjut ke target berikutnya
 					end
 				end
 			end
@@ -211,6 +211,6 @@ task.spawn(function()
 			collecting = false
 		end
 
-		task.wait(0.3)
+		task.wait(0.5)
 	end
 end)

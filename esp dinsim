@@ -1,11 +1,13 @@
+-- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local rootPart = nil
 
--- KONFIGURASI
+-- Konfigurasi
 local TARGET_NAME = "AmberRock"
 local MOVE_SPEED = 200
 local MAX_DISTANCE = 1000
@@ -13,74 +15,129 @@ local ESP_COLOR = Color3.fromRGB(255, 170, 0)
 
 local espEnabled = false
 local autoCollectEnabled = false
+local autoAmberEnabled = false
 local collecting = false
+
+-- GUI & ExtractBtn
+local extractBtn = player:WaitForChild("PlayerGui"):WaitForChild("Main")
+	:WaitForChild("Background")
+	:WaitForChild("MovieEventBackground")
+	:WaitForChild("IncubatorBackground")
+	:WaitForChild("IncubationInteractionFrame")
+	:WaitForChild("ExtractBtn")
+
+local extractAmberEvent = game.Workspace:WaitForChild("GameEvents"):WaitForChild("MovieEvent2025"):WaitForChild("ExtractAmber")
 
 -- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "AmberGUI"
 gui.ResetOnSpawn = false
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 120)
-frame.Position = UDim2.new(0.5, -100, 0.5, -60)
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-frame.BackgroundTransparency = 0.3
-frame.Active = true
-frame.Selectable = true
-frame.Draggable = false
-frame.Parent = gui
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 230, 0, 200)
+mainFrame.Position = UDim2.new(0, 30, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Selectable = true
+mainFrame.Draggable = true
+mainFrame.Parent = gui
 
--- Geser GUI Support
-local dragging, dragStart, startPos
-frame.InputBegan:Connect(function(input)
+-- Header
+local header = Instance.new("TextLabel", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 30)
+header.BackgroundTransparency = 1
+header.Text = "Amber"
+header.Font = Enum.Font.GothamBold
+header.TextColor3 = Color3.new(1, 1, 1)
+header.TextScaled = true
+
+-- ESP Button
+local espBtn = Instance.new("TextButton", mainFrame)
+espBtn.Size = UDim2.new(1, -20, 0, 35)
+espBtn.Position = UDim2.new(0, 10, 0, 40)
+espBtn.Text = "☐ ESP: OFF"
+espBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+espBtn.TextColor3 = Color3.new(1, 1, 1)
+espBtn.TextScaled = true
+espBtn.Font = Enum.Font.GothamBold
+
+-- AutoCollect Button
+local autoBtn = Instance.new("TextButton", mainFrame)
+autoBtn.Size = UDim2.new(1, -20, 0, 35)
+autoBtn.Position = UDim2.new(0, 10, 0, 80)
+autoBtn.Text = "⚙️ AutoCollect: OFF"
+autoBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+autoBtn.TextColor3 = Color3.new(1, 1, 1)
+autoBtn.TextScaled = true
+autoBtn.Font = Enum.Font.GothamBold
+
+-- AutoExtractAmber Button
+local amberBtn = Instance.new("TextButton", mainFrame)
+amberBtn.Size = UDim2.new(1, -20, 0, 35)
+amberBtn.Position = UDim2.new(0, 10, 0, 120)
+amberBtn.Text = "🟠 AutoExtractAmber: OFF"
+amberBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+amberBtn.TextColor3 = Color3.new(1, 1, 1)
+amberBtn.TextScaled = true
+amberBtn.Font = Enum.Font.GothamBold
+
+-- Toggle (Show/Hide) Button as ImageButton
+local toggleBtn = Instance.new("ImageButton", gui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0, 10, 1, -60)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Image = "rbxassetid://132405759636904"
+toggleBtn.ImageColor3 = Color3.new(1, 1, 1)
+
+-- Dragging for toggleBtn (mobile & PC)
+local dragging = false
+local dragStart, startPos
+
+local function updateDrag(input)
+	if not dragging then return end
+	local delta = input.Position - dragStart
+	toggleBtn.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end
+
+toggleBtn.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
-		startPos = frame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
-		end)
+		startPos = toggleBtn.Position
 	end
 end)
 
-frame.InputChanged:Connect(function(input)
+UserInputService.InputChanged:Connect(function(input)
 	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		updateDrag(input)
 	end
 end)
 
--- Tombol GUI
-local espBtn = Instance.new("TextButton", frame)
-espBtn.Size = UDim2.new(1, 0, 0.33, 0)
-espBtn.Position = UDim2.new(0, 0, 0, 0)
-espBtn.Text = "🔲 Esp Amber: OFF"
-espBtn.BackgroundTransparency = 1
-espBtn.TextColor3 = Color3.new(1, 1, 1)
-espBtn.TextScaled = true
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
 
-local autoBtn = Instance.new("TextButton", frame)
-autoBtn.Size = UDim2.new(1, 0, 0.33, 0)
-autoBtn.Position = UDim2.new(0, 0, 0.33, 0)
-autoBtn.Text = "⚙️ AutoCollect: OFF"
-autoBtn.BackgroundTransparency = 1
-autoBtn.TextColor3 = Color3.new(1, 1, 1)
-autoBtn.TextScaled = true
+-- Toggle functionality (show/hide)
+local isHidden = false
+toggleBtn.MouseButton1Click:Connect(function()
+	isHidden = not isHidden
+	mainFrame.Visible = not isHidden
+end)
 
-local hideBtn = Instance.new("TextButton", frame)
-hideBtn.Size = UDim2.new(1, 0, 0.34, 0)
-hideBtn.Position = UDim2.new(0, 0, 0.66, 0)
-hideBtn.Text = "🔽 Hide"
-hideBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-hideBtn.TextColor3 = Color3.new(1, 1, 1)
-hideBtn.TextScaled = true
-
--- Toggle GUI
+-- Button Toggles
 espBtn.MouseButton1Click:Connect(function()
 	espEnabled = not espEnabled
-	espBtn.Text = espEnabled and "🟩 Esp Amber: ON" or "🔲 Esp Amber: OFF"
+	espBtn.Text = espEnabled and "🟩 ESP: ON" or "☐ ESP: OFF"
 end)
 
 autoBtn.MouseButton1Click:Connect(function()
@@ -88,15 +145,12 @@ autoBtn.MouseButton1Click:Connect(function()
 	autoBtn.Text = autoCollectEnabled and "🟢 AutoCollect: ON" or "⚙️ AutoCollect: OFF"
 end)
 
-local isHidden = false
-hideBtn.MouseButton1Click:Connect(function()
-	isHidden = not isHidden
-	espBtn.Visible = not isHidden
-	autoBtn.Visible = not isHidden
-	hideBtn.Text = isHidden and "🔼 Show" or "🔽 Hide"
+amberBtn.MouseButton1Click:Connect(function()
+	autoAmberEnabled = not autoAmberEnabled
+	amberBtn.Text = autoAmberEnabled and "🟠 AutoExtractAmber: ON" or "🟠 AutoExtractAmber: OFF"
 end)
 
--- ESP
+-- ESP Function
 local function createESP(model)
 	if model:FindFirstChild("ESPLabel") then return end
 	local part = model:FindFirstChildWhichIsA("BasePart")
@@ -116,7 +170,7 @@ local function createESP(model)
 	label.TextScaled = true
 end
 
--- Interact
+-- Prompt Interact
 local function interactWithPrompt(model)
 	for _, d in pairs(model:GetDescendants()) do
 		if d:IsA("ProximityPrompt") then
@@ -128,7 +182,7 @@ local function interactWithPrompt(model)
 	end
 end
 
--- Tween dan Interact
+-- Tween Movement
 local function moveTo(model)
 	local part = model:FindFirstChildWhichIsA("BasePart")
 	if not part then return false end
@@ -201,16 +255,19 @@ task.spawn(function()
 
 			for _, target in ipairs(targets) do
 				if autoCollectEnabled and target.model and target.model.Parent then
-					local success = moveTo(target.model)
-					if success then
-						-- langsung lanjut ke target berikutnya
-					end
+					moveTo(target.model)
 				end
 			end
 
 			collecting = false
 		end
 
-		task.wait(0.5)
+		if autoAmberEnabled and extractBtn and extractBtn.Visible then
+			pcall(function()
+				extractAmberEvent:FireServer()
+			end)
+		end
+
+		task.wait(0.1)
 	end
 end)

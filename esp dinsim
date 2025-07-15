@@ -10,7 +10,7 @@ local rootPart = nil
 -- Konfigurasi
 local TARGET_NAME = "AmberRock"
 local MOVE_SPEED = 200
-local MAX_DISTANCE = 1000
+local MAX_DISTANCE = 2000
 local ESP_COLOR = Color3.fromRGB(255, 170, 0)
 
 local espEnabled = false

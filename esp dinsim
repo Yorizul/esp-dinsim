@@ -1,0 +1,158 @@
+local TweenService = game:GetService("TweenService")
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+local espEnabled = true
+local autoCollect = true
+local collectSpeed = 150 -- Bisa diubah dari GUI
+
+-- === ESP ===
+local function createESP(target)
+	if target:FindFirstChild("ESP") or not espEnabled then return end
+
+	local adornee = target:IsA("Model") and target.PrimaryPart or target
+	if not adornee then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ESP"
+	billboard.Adornee = adornee
+	billboard.Size = UDim2.new(0, 100, 0, 30)
+	billboard.AlwaysOnTop = true
+	billboard.StudsOffset = Vector3.new(0, 2, 0)
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = "AmberRock"
+	label.TextColor3 = Color3.fromRGB(255, 170, 0)
+	label.TextStrokeTransparency = 0.5
+	label.TextScaled = true
+	label.Font = Enum.Font.SourceSansBold
+	label.Parent = billboard
+
+	billboard.Parent = target
+end
+
+local function removeAllESP()
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj.Name == "AmberRock" and obj:FindFirstChild("ESP") then
+			obj.ESP:Destroy()
+		end
+	end
+end
+
+-- === Tween to Target ===
+local moving = false
+local function moveToTarget(part)
+	if moving or not autoCollect then return end
+	moving = true
+
+	local distance = (hrp.Position - part.Position).Magnitude
+	local time = distance / collectSpeed
+
+	local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = part.CFrame + Vector3.new(0, 2, 0)})
+	tween:Play()
+	tween.Completed:Wait()
+
+	task.wait(0.1)
+	moving = false
+end
+
+-- === Handle Rock ===
+local function handleAmberRock(obj)
+	if obj.Name ~= "AmberRock" then return end
+	if not (obj:IsA("Model") or obj:IsA("BasePart")) then return end
+	task.wait(0.2)
+
+	if obj:IsA("Model") and not obj.PrimaryPart then
+		local part = obj:FindFirstChildWhichIsA("BasePart")
+		if not part then return end
+		obj.PrimaryPart = part
+	end
+
+	createESP(obj)
+
+	local part = obj:IsA("Model") and obj.PrimaryPart or obj
+	if part then
+		moveToTarget(part)
+	end
+end
+
+-- === Scan semua ===
+local function scanAll()
+	for _, obj in pairs(workspace:GetDescendants()) do
+		handleAmberRock(obj)
+	end
+end
+
+workspace.DescendantAdded:Connect(handleAmberRock)
+
+-- === GUI ===
+local function createMobileGui()
+	local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+	gui.Name = "ESPGui"
+	gui.ResetOnSpawn = false
+
+	local espButton = Instance.new("TextButton")
+	espButton.Size = UDim2.new(0, 120, 0, 35)
+	espButton.Position = UDim2.new(0, 10, 0, 10)
+	espButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	espButton.TextColor3 = Color3.new(1, 1, 1)
+	espButton.TextScaled = true
+	espButton.Font = Enum.Font.SourceSansBold
+	espButton.Text = "ESP: ON"
+	espButton.Parent = gui
+
+	local collectButton = Instance.new("TextButton")
+	collectButton.Size = UDim2.new(0, 120, 0, 35)
+	collectButton.Position = UDim2.new(0, 10, 0, 50)
+	collectButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	collectButton.TextColor3 = Color3.new(1, 1, 1)
+	collectButton.TextScaled = true
+	collectButton.Font = Enum.Font.SourceSansBold
+	collectButton.Text = "Collect: ON"
+	collectButton.Parent = gui
+
+	local speedBox = Instance.new("TextBox")
+	speedBox.Size = UDim2.new(0, 120, 0, 35)
+	speedBox.Position = UDim2.new(0, 10, 0, 90)
+	speedBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	speedBox.TextColor3 = Color3.new(1, 1, 1)
+	speedBox.TextScaled = true
+	speedBox.Font = Enum.Font.SourceSans
+	speedBox.PlaceholderText = "Speed (100–200)"
+	speedBox.Text = tostring(collectSpeed)
+	speedBox.ClearTextOnFocus = false
+	speedBox.Parent = gui
+
+	espButton.MouseButton1Click:Connect(function()
+		espEnabled = not espEnabled
+		espButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+		if espEnabled then
+			scanAll()
+		else
+			removeAllESP()
+		end
+	end)
+
+	collectButton.MouseButton1Click:Connect(function()
+		autoCollect = not autoCollect
+		collectButton.Text = autoCollect and "Collect: ON" or "Collect: OFF"
+	end)
+
+	speedBox.FocusLost:Connect(function(enterPressed)
+		local val = tonumber(speedBox.Text)
+		if val and val >= 100 and val <= 200 then
+			collectSpeed = val
+			speedBox.Text = tostring(val)
+		else
+			speedBox.Text = tostring(collectSpeed)
+		end
+	end)
+end
+
+-- === Start ===
+createMobileGui()
+scanAll()

@@ -1,167 +1,137 @@
--- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 local rootPart = nil
-
--- Konfigurasi
 local TARGET_NAME = "AmberRock"
 local MOVE_SPEED = 200
-local MAX_DISTANCE = 2000
+local CENTER_POSITION = Vector3.new(0, 0, 0)
 local ESP_COLOR = Color3.fromRGB(255, 170, 0)
 
 local espEnabled = false
 local autoCollectEnabled = false
+local autoExplosionEnabled = false
 local autoAmberEnabled = false
 local collecting = false
 
--- GUI & ExtractBtn
 local extractBtn = player:WaitForChild("PlayerGui"):WaitForChild("Main")
-	:WaitForChild("Background")
-	:WaitForChild("MovieEventBackground")
-	:WaitForChild("IncubatorBackground")
-	:WaitForChild("IncubationInteractionFrame")
+	:WaitForChild("Background"):WaitForChild("MovieEventBackground")
+	:WaitForChild("IncubatorBackground"):WaitForChild("IncubationInteractionFrame")
 	:WaitForChild("ExtractBtn")
+local extractAmberEvent = workspace:WaitForChild("GameEvents"):WaitForChild("MovieEvent2025"):WaitForChild("ExtractAmber")
 
-local extractAmberEvent = game.Workspace:WaitForChild("GameEvents"):WaitForChild("MovieEvent2025"):WaitForChild("ExtractAmber")
-
--- GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
 gui.Name = "AmberGUI"
 gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 230, 0, 200)
-mainFrame.Position = UDim2.new(0, 30, 0.5, -100)
-mainFrame.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 220, 0, 240)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -120)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Selectable = true
 mainFrame.Draggable = true
-mainFrame.Parent = gui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(60, 60, 60)
 
--- Header
 local header = Instance.new("TextLabel", mainFrame)
-header.Size = UDim2.new(1, 0, 0, 30)
+header.Size = UDim2.new(1, 0, 0, 36)
 header.BackgroundTransparency = 1
-header.Text = "Amber"
-header.Font = Enum.Font.GothamBold
-header.TextColor3 = Color3.new(1, 1, 1)
+header.Text = "⚒️ Amber Utilities"
+header.Font = Enum.Font.FredokaOne
+header.TextColor3 = Color3.fromRGB(255, 200, 50)
 header.TextScaled = true
 
--- ESP Button
-local espBtn = Instance.new("TextButton", mainFrame)
-espBtn.Size = UDim2.new(1, -20, 0, 35)
-espBtn.Position = UDim2.new(0, 10, 0, 40)
-espBtn.Text = "☐ ESP: OFF"
-espBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-espBtn.TextColor3 = Color3.new(1, 1, 1)
-espBtn.TextScaled = true
-espBtn.Font = Enum.Font.GothamBold
-
--- AutoCollect Button
-local autoBtn = Instance.new("TextButton", mainFrame)
-autoBtn.Size = UDim2.new(1, -20, 0, 35)
-autoBtn.Position = UDim2.new(0, 10, 0, 80)
-autoBtn.Text = "⚙️ AutoCollect: OFF"
-autoBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-autoBtn.TextColor3 = Color3.new(1, 1, 1)
-autoBtn.TextScaled = true
-autoBtn.Font = Enum.Font.GothamBold
-
--- AutoExtractAmber Button
-local amberBtn = Instance.new("TextButton", mainFrame)
-amberBtn.Size = UDim2.new(1, -20, 0, 35)
-amberBtn.Position = UDim2.new(0, 10, 0, 120)
-amberBtn.Text = "🟠 AutoExtractAmber: OFF"
-amberBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-amberBtn.TextColor3 = Color3.new(1, 1, 1)
-amberBtn.TextScaled = true
-amberBtn.Font = Enum.Font.GothamBold
-
--- Toggle (Show/Hide) Button as ImageButton
-local toggleBtn = Instance.new("ImageButton", gui)
-toggleBtn.Size = UDim2.new(0, 50, 0, 50)
-toggleBtn.Position = UDim2.new(0, 10, 1, -60)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
-toggleBtn.BorderSizePixel = 0
-toggleBtn.Image = "rbxassetid://132405759636904"
-toggleBtn.ImageColor3 = Color3.new(1, 1, 1)
-
--- Dragging for toggleBtn (mobile & PC)
-local dragging = false
-local dragStart, startPos
-
-local function updateDrag(input)
-	if not dragging then return end
-	local delta = input.Position - dragStart
-	toggleBtn.Position = UDim2.new(
-		startPos.X.Scale,
-		startPos.X.Offset + delta.X,
-		startPos.Y.Scale,
-		startPos.Y.Offset + delta.Y
-	)
+local function createToggleButton(text, posY)
+	local btn = Instance.new("TextButton", mainFrame)
+	btn.Size = UDim2.new(1, -30, 0, 34)
+	btn.Position = UDim2.new(0, 15, 0, posY)
+	btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamMedium
+	btn.Text = text
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Color = Color3.fromRGB(80, 80, 80)
+	stroke.Thickness = 1.2
+	return btn
 end
 
+local espBtn = createToggleButton("☐ ESP: OFF", 45)
+local autoBtn = createToggleButton("⚙️ AutoCollect: OFF", 85)
+local explosionBtn = createToggleButton("💥 AutoExplosion: OFF", 125)
+local amberBtn = createToggleButton("🟠 AutoExtractAmber: OFF", 165)
+
+local toggleBtn = Instance.new("ImageButton", gui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0.5, 120, 0.5, -150)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+toggleBtn.Image = "rbxassetid://72345792170051"
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 12)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+
+local dragging, dragStart, startPos
 toggleBtn.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
 		startPos = toggleBtn.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
 	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
 	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		updateDrag(input)
+		local delta = input.Position - dragStart
+		toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 	end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-	end
-end)
+local function updateBtnState(button, enabled, onText, offText, onColor, offColor)
+	button.Text = enabled and onText or offText
+	button.BackgroundColor3 = enabled and onColor or offColor
+end
 
--- Toggle functionality (show/hide)
-local isHidden = false
-toggleBtn.MouseButton1Click:Connect(function()
-	isHidden = not isHidden
-	mainFrame.Visible = not isHidden
-end)
-
--- Button Toggles
 espBtn.MouseButton1Click:Connect(function()
 	espEnabled = not espEnabled
-	espBtn.Text = espEnabled and "🟩 ESP: ON" or "☐ ESP: OFF"
+	updateBtnState(espBtn, espEnabled, "🟩 ESP: ON", "☐ ESP: OFF", Color3.fromRGB(30, 120, 30), Color3.fromRGB(35, 35, 35))
 end)
-
 autoBtn.MouseButton1Click:Connect(function()
 	autoCollectEnabled = not autoCollectEnabled
-	autoBtn.Text = autoCollectEnabled and "🟢 AutoCollect: ON" or "⚙️ AutoCollect: OFF"
+	updateBtnState(autoBtn, autoCollectEnabled, "🟢 AutoCollect: ON", "⚙️ AutoCollect: OFF", Color3.fromRGB(40, 110, 40), Color3.fromRGB(35, 35, 35))
 end)
-
+explosionBtn.MouseButton1Click:Connect(function()
+	autoExplosionEnabled = not autoExplosionEnabled
+	updateBtnState(explosionBtn, autoExplosionEnabled, "💥 AutoExplosion: ON", "💥 AutoExplosion: OFF", Color3.fromRGB(150, 60, 60), Color3.fromRGB(35, 35, 35))
+end)
 amberBtn.MouseButton1Click:Connect(function()
 	autoAmberEnabled = not autoAmberEnabled
-	amberBtn.Text = autoAmberEnabled and "🟠 AutoExtractAmber: ON" or "🟠 AutoExtractAmber: OFF"
+	updateBtnState(amberBtn, autoAmberEnabled, "🟠 AutoExtractAmber: ON", "🟠 AutoExtractAmber: OFF", Color3.fromRGB(160, 90, 20), Color3.fromRGB(35, 35, 35))
 end)
 
--- ESP Function
 local function createESP(model)
 	if model:FindFirstChild("ESPLabel") then return end
 	local part = model:FindFirstChildWhichIsA("BasePart")
 	if not part then return end
-
 	local billboard = Instance.new("BillboardGui", model)
 	billboard.Name = "ESPLabel"
 	billboard.Size = UDim2.new(0, 100, 0, 30)
 	billboard.Adornee = part
 	billboard.AlwaysOnTop = true
-
 	local label = Instance.new("TextLabel", billboard)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
@@ -170,59 +140,27 @@ local function createESP(model)
 	label.TextScaled = true
 end
 
--- Prompt Interact
 local function interactWithPrompt(model)
 	for _, d in pairs(model:GetDescendants()) do
 		if d:IsA("ProximityPrompt") then
-			pcall(function()
-				fireproximityprompt(d)
-			end)
+			pcall(function() fireproximityprompt(d) end)
 			break
 		end
 	end
 end
 
--- Tween Movement
-local function moveTo(model)
-	local part = model:FindFirstChildWhichIsA("BasePart")
-	if not part then return false end
-
-	local rayOrigin = part.Position + Vector3.new(0, 5, 0)
-	local rayDirection = Vector3.new(0, -100, 0)
-	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = {model}
-	params.FilterType = Enum.RaycastFilterType.Blacklist
-
-	local result = workspace:Raycast(rayOrigin, rayDirection, params)
-	local targetPos = result and result.Position + Vector3.new(0, 3, 0) or part.Position + Vector3.new(0, 3, 0)
-
-	local dist = (rootPart.Position - targetPos).Magnitude
-	local time = dist / MOVE_SPEED
-
-	local tween = TweenService:Create(rootPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
-		CFrame = CFrame.new(targetPos)
-	})
-
+local function moveToTarget(part)
+	local dest = part.Position + Vector3.new(0, 3, 0)
+	local dist = (rootPart.Position - dest).Magnitude
+	local tween = TweenService:Create(rootPart, TweenInfo.new(dist / MOVE_SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(dest)})
 	tween:Play()
 	tween.Completed:Wait()
-
-	for i = 1, 20 do
-		interactWithPrompt(model)
-		task.wait(0.1)
-		if not model:IsDescendantOf(workspace) then
-			return true
-		end
-	end
-
-	return false
 end
 
--- Main Loop
 task.spawn(function()
 	while true do
 		if not rootPart or not rootPart:IsDescendantOf(workspace) then
-			local char = player.Character or player.CharacterAdded:Wait()
-			rootPart = char:WaitForChild("HumanoidRootPart")
+			rootPart = (player.Character or player.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
 		end
 
 		if espEnabled then
@@ -233,33 +171,43 @@ task.spawn(function()
 			end
 		end
 
-		if autoCollectEnabled and not collecting then
-			collecting = true
-			local targets = {}
+		if not collecting then
+			local target = nil
+			local minDistance = math.huge
 
-			for _, obj in pairs(workspace:GetDescendants()) do
-				if obj:IsA("Model") and obj.Name == TARGET_NAME then
-					local part = obj:FindFirstChildWhichIsA("BasePart")
-					if part then
-						local dist = (rootPart.Position - part.Position).Magnitude
-						if dist <= MAX_DISTANCE then
-							table.insert(targets, {model = obj, distance = dist})
+			if autoExplosionEnabled then
+				for _, obj in pairs(workspace:GetDescendants()) do
+					if obj:IsA("Part") and obj.Name == "Explosion" and obj.Parent and obj.Parent.Name == "MiscellaneousStorage" then
+						local dist = (rootPart.Position - obj.Position).Magnitude
+						if dist < minDistance then
+							minDistance = dist
+							target = obj
 						end
 					end
 				end
 			end
 
-			table.sort(targets, function(a, b)
-				return a.distance < b.distance
-			end)
-
-			for _, target in ipairs(targets) do
-				if autoCollectEnabled and target.model and target.model.Parent then
-					moveTo(target.model)
+			if not target and autoCollectEnabled then
+				for _, obj in pairs(workspace:GetDescendants()) do
+					if obj:IsA("Model") and obj.Name == TARGET_NAME and obj:FindFirstChildWhichIsA("BasePart") then
+						local part = obj:FindFirstChildWhichIsA("BasePart")
+						local dist = (rootPart.Position - part.Position).Magnitude
+						if dist < minDistance then
+							minDistance = dist
+							target = part
+						end
+					end
 				end
 			end
 
-			collecting = false
+			if target then
+				collecting = true
+				moveToTarget(target)
+				local model = target:FindFirstAncestorOfClass("Model")
+				if model then interactWithPrompt(model) end
+				task.wait(0.5)
+				collecting = false
+			end
 		end
 
 		if autoAmberEnabled and extractBtn and extractBtn.Visible then
@@ -270,4 +218,49 @@ task.spawn(function()
 
 		task.wait(0.1)
 	end
+end)
+
+local function createLockedCredit()
+	local credit = Instance.new("TextLabel")
+	credit.Name = "💡CreditInfo"
+	credit.Size = UDim2.new(1, -20, 0, 20)
+	credit.Position = UDim2.new(0, 10, 1, -25)
+	credit.BackgroundTransparency = 1
+	credit.Text = "Made by Yorizul"
+	credit.TextColor3 = Color3.fromRGB(120, 120, 120)
+	credit.Font = Enum.Font.Gotham
+	credit.TextScaled = true
+	credit.TextXAlignment = Enum.TextXAlignment.Right
+	credit.ZIndex = 10
+	credit.ClipsDescendants = true
+	credit.Parent = mainFrame
+
+	RunService.Stepped:Connect(function()
+		if not credit or not credit.Parent then
+			createLockedCredit()
+		end
+	end)
+end
+createLockedCredit()
+
+player.Idled:Connect(function()
+	VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	task.wait(1)
+	VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+local notif = Instance.new("TextLabel", gui)
+notif.Size = UDim2.new(0, 180, 0, 30)
+notif.Position = UDim2.new(1, -190, 1, -40)
+notif.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+notif.TextColor3 = Color3.fromRGB(0, 255, 0)
+notif.Text = "✅ Anti-AFK Activated"
+notif.Font = Enum.Font.Gotham
+notif.TextScaled = true
+notif.Visible = true
+notif.BackgroundTransparency = 0.2
+Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
+
+delay(5, function()
+	notif:Destroy()
 end)

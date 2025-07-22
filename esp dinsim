@@ -1,1 +1,323 @@
 
+--// SERVICES
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+
+--// VARIABLES
+local player = Players.LocalPlayer
+local rootPart = nil
+local TARGET_NAME = "AmberRock"
+local MOVE_SPEED = 250
+local ESP_COLOR = Color3.fromRGB(255, 170, 0)
+
+local espEnabled = false
+local autoCollectEnabled = false
+local autoExplosionEnabled = false
+local autoAmberEnabled = false
+local collecting = false
+local collectedAmbers = {}
+local skipFailedAmber = false
+
+local extractBtn = player:WaitForChild("PlayerGui"):WaitForChild("Main")
+	:WaitForChild("Background"):WaitForChild("MovieEventBackground")
+	:WaitForChild("IncubatorBackground"):WaitForChild("IncubationInteractionFrame")
+	:WaitForChild("ExtractBtn")
+local extractAmberEvent = workspace:WaitForChild("GameEvents"):WaitForChild("MovieEvent2025"):WaitForChild("ExtractAmber")
+
+--// GUI SETUP
+local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+gui.Name = "AmberGUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 220, 0, 290)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -145)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Selectable = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(60, 60, 60)
+
+local header = Instance.new("TextLabel", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 36)
+header.BackgroundTransparency = 1
+header.Text = "⚒️ Amber Utilities"
+header.Font = Enum.Font.FredokaOne
+header.TextColor3 = Color3.fromRGB(255, 200, 50)
+header.TextScaled = true
+
+local function createToggleButton(text, posY)
+	local btn = Instance.new("TextButton", mainFrame)
+	btn.Size = UDim2.new(1, -30, 0, 34)
+	btn.Position = UDim2.new(0, 15, 0, posY)
+	btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamMedium
+	btn.Text = text
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Color = Color3.fromRGB(80, 80, 80)
+	stroke.Thickness = 1.2
+	return btn
+end
+
+--// BUTTONS
+local espBtn = createToggleButton("☐ ESP: OFF", 45)
+local autoBtn = createToggleButton("⚙️ AutoCollect: OFF", 85)
+local explosionBtn = createToggleButton("💥 AutoExplosion: OFF", 125)
+local amberBtn = createToggleButton("🟠 AutoExtractAmber: OFF", 165)
+local skipBtn = createToggleButton("🔕 Skip Failed: OFF", 205)
+local resetBtn = createToggleButton("♻️ Reset CollectedAmber", 245)
+
+local toggleBtn = Instance.new("ImageButton", gui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0.5, 120, 0.5, -150)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+toggleBtn.Image = "rbxassetid://72345792170051"
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 12)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+
+local dragging, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = toggleBtn.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+local function updateBtnState(button, enabled, onText, offText, onColor, offColor)
+	button.Text = enabled and onText or offText
+	button.BackgroundColor3 = enabled and onColor or offColor
+end
+
+espBtn.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	updateBtnState(espBtn, espEnabled, "🟩 ESP: ON", "☐ ESP: OFF", Color3.fromRGB(30, 120, 30), Color3.fromRGB(35, 35, 35))
+end)
+autoBtn.MouseButton1Click:Connect(function()
+	autoCollectEnabled = not autoCollectEnabled
+	updateBtnState(autoBtn, autoCollectEnabled, "🟢 AutoCollect: ON", "⚙️ AutoCollect: OFF", Color3.fromRGB(40, 110, 40), Color3.fromRGB(35, 35, 35))
+end)
+explosionBtn.MouseButton1Click:Connect(function()
+	autoExplosionEnabled = not autoExplosionEnabled
+	updateBtnState(explosionBtn, autoExplosionEnabled, "💥 AutoExplosion: ON", "💥 AutoExplosion: OFF", Color3.fromRGB(150, 60, 60), Color3.fromRGB(35, 35, 35))
+end)
+amberBtn.MouseButton1Click:Connect(function()
+	autoAmberEnabled = not autoAmberEnabled
+	updateBtnState(amberBtn, autoAmberEnabled, "🟠 AutoExtractAmber: ON", "🟠 AutoExtractAmber: OFF", Color3.fromRGB(160, 90, 20), Color3.fromRGB(35, 35, 35))
+end)
+skipBtn.MouseButton1Click:Connect(function()
+	skipFailedAmber = not skipFailedAmber
+	updateBtnState(skipBtn, skipFailedAmber, "🔕 Skip Failed: ON", "🔕 Skip Failed: OFF", Color3.fromRGB(150, 100, 100), Color3.fromRGB(35, 35, 35))
+end)
+resetBtn.MouseButton1Click:Connect(function()
+	collectedAmbers = {}
+	resetBtn.Text = "✅ Reset Done!"
+	task.delay(1.5, function()
+		resetBtn.Text = "♻️ Reset CollectedAmber"
+	end)
+end)
+
+--// ESP
+local function createESP(model)
+	if model:FindFirstChild("ESPLabel") then return end
+	local part = model:FindFirstChildWhichIsA("BasePart")
+	if not part then return end
+	local billboard = Instance.new("BillboardGui", model)
+	billboard.Name = "ESPLabel"
+	billboard.Size = UDim2.new(0, 100, 0, 30)
+	billboard.Adornee = part
+	billboard.AlwaysOnTop = true
+	local label = Instance.new("TextLabel", billboard)
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = model.Name
+	label.TextColor3 = ESP_COLOR
+	label.TextScaled = true
+end
+
+--// Move to target
+local function moveToTarget(part)
+	local dest = part.Position + Vector3.new(0, 1, 0)
+	local dist = (rootPart.Position - dest).Magnitude
+	local tween = TweenService:Create(rootPart, TweenInfo.new(dist / MOVE_SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(dest)})
+	rootPart.CanCollide = false
+	tween:Play()
+	tween.Completed:Wait()
+	task.wait(0.05)
+	rootPart.CanCollide = true
+	if rootPart.Velocity.Y < -10 then
+		rootPart.Velocity = Vector3.zero
+	end
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end
+end
+
+--// Interact logic
+local function interactWithPrompt(model)
+	for _, d in pairs(model:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			d.HoldDuration = 0
+			pcall(function()
+				fireproximityprompt(d)
+				task.wait(0.1)
+				fireproximityprompt(d)
+			end)
+			break
+		end
+	end
+end
+
+--// MAIN LOOP
+task.spawn(function()
+	while true do
+		if not rootPart or not rootPart:IsDescendantOf(workspace) then
+			rootPart = (player.Character or player.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
+		end
+
+		if espEnabled then
+			for _, obj in pairs(workspace:GetDescendants()) do
+				if obj:IsA("Model") and obj.Name == TARGET_NAME then
+					createESP(obj)
+				end
+			end
+		end
+
+		if not collecting then
+			local target = nil
+			local minDistance = math.huge
+
+			if autoExplosionEnabled then
+				for _, obj in pairs(workspace:GetDescendants()) do
+					if obj:IsA("Part") and obj.Name == "Explosion" and obj.Parent and obj.Parent.Name == "MiscellaneousStorage" then
+						local dist = (rootPart.Position - obj.Position).Magnitude
+						if dist < minDistance then
+							minDistance = dist
+							target = obj
+						end
+					end
+				end
+			end
+
+			if not target and autoCollectEnabled then
+				for _, obj in pairs(workspace:GetDescendants()) do
+					if obj:IsA("Model") and obj.Name == TARGET_NAME and obj:FindFirstChildWhichIsA("BasePart") then
+						if not collectedAmbers[obj] then
+							local part = obj:FindFirstChildWhichIsA("BasePart")
+							local dist = (rootPart.Position - part.Position).Magnitude
+							if dist < minDistance then
+								minDistance = dist
+								target = part
+							end
+						end
+					end
+				end
+			end
+
+			if target then
+				collecting = true
+				moveToTarget(target)
+				local model = target:FindFirstAncestorOfClass("Model")
+				if model then
+					interactWithPrompt(model)
+					task.wait(0.25)
+					if skipFailedAmber then
+						collectedAmbers[model] = true
+					elseif not model or not model:IsDescendantOf(workspace) then
+						collectedAmbers[model] = true
+					end
+				end
+				collecting = false
+			end
+		end
+
+		for model in pairs(collectedAmbers) do
+			if not model or not model:IsDescendantOf(workspace) then
+				collectedAmbers[model] = nil
+			end
+		end
+
+		if autoAmberEnabled and extractBtn and extractBtn.Visible then
+			pcall(function()
+				extractAmberEvent:FireServer()
+			end)
+		end
+
+		task.wait(0.1)
+	end
+end)
+
+--// CREDIT LOCK
+local function createLockedCredit()
+	local credit = Instance.new("TextLabel")
+	credit.Name = "💡CreditInfo"
+	credit.Size = UDim2.new(1, -20, 0, 20)
+	credit.Position = UDim2.new(0, 10, 1, -25)
+	credit.BackgroundTransparency = 1
+	credit.Text = "Made by Yorizul"
+	credit.TextColor3 = Color3.fromRGB(120, 120, 120)
+	credit.Font = Enum.Font.Gotham
+	credit.TextScaled = true
+	credit.TextXAlignment = Enum.TextXAlignment.Right
+	credit.ZIndex = 10
+	credit.ClipsDescendants = true
+	credit.Parent = mainFrame
+
+	RunService.Stepped:Connect(function()
+		if not credit or not credit.Parent then
+			createLockedCredit()
+		end
+	end)
+end
+createLockedCredit()
+
+--// ANTI-AFK
+player.Idled:Connect(function()
+	VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	task.wait(1)
+	VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+--// NOTIF
+local notif = Instance.new("TextLabel", gui)
+notif.Size = UDim2.new(0, 180, 0, 30)
+notif.Position = UDim2.new(1, -190, 1, -40)
+notif.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+notif.TextColor3 = Color3.fromRGB(0, 255, 0)
+notif.Text = "✅ Anti-AFK Activated"
+notif.Font = Enum.Font.Gotham
+notif.TextScaled = true
+notif.Visible = true
+notif.BackgroundTransparency = 0.2
+Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
+
+delay(5, function()
+	notif:Destroy()
+end)
